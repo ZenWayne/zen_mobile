@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Stylized "Z" enso mark for ZenAgent -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,40 L68,40 L68,47 L51,61 L68,61 L68,68 L40,68 L40,61 L57,47 L40,47 Z" />
+    <path
+        android:strokeColor="#0A84FF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M70,38 A20,20 0 1 0 72,70" />
+</vector>
