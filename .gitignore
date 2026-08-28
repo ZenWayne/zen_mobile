@@ -11,3 +11,9 @@ build/
 *.apk
 *.ap_
 *.aab
+
+# Local agent/tooling state (worktrees, local config)
+.claude/
+
+# Native build artifact (produced by Bazel, not checked in)
+app/src/main/jniLibs/
