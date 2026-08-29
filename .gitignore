@@ -24,3 +24,6 @@ app/src/main/jniLibs/
 
 # Built AAR (produced by zen/android-inference Bazel, not checked in)
 app/libs/
+
+# Node test dependencies (npm install regenerates)
+tests/appium/node_modules/
