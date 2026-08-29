@@ -1,0 +1,27 @@
+{
+  "name": "zenagent-appium-tests",
+  "version": "1.0.0",
+  "description": "Appium 2.x end-to-end tests for ZenAgent Android (Compose) app",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test:smoke": "DEVICE=bc72 npx mocha tests/00_launch_smoke.test.js --timeout 90000 --exit",
+    "test:states": "DEVICE=bc72 npx mocha tests/01_conversation_states.test.js --timeout 120000 --exit",
+    "test:inference": "DEVICE=bc72 npx mocha tests/02_inference_streaming.test.js --timeout 180000 --exit",
+    "test:stop": "DEVICE=bc72 npx mocha tests/03_stop_control.test.js --timeout 180000 --exit",
+    "test:approval": "DEVICE=bc72 npx mocha tests/04_approval_gate.test.js --timeout 120000 --exit",
+    "test:all": "DEVICE=bc72 npx mocha 'tests/**/*.test.js' --timeout 180000 --exit",
+    "test:smoke:emu": "DEVICE=emu npx mocha tests/00_launch_smoke.test.js --timeout 90000 --exit",
+    "test:states:emu": "DEVICE=emu npx mocha tests/01_conversation_states.test.js --timeout 120000 --exit",
+    "test:approval:emu": "DEVICE=emu npx mocha tests/04_approval_gate.test.js --timeout 120000 --exit"
+  },
+  "dependencies": {
+    "webdriverio": "^8.38.0"
+  },
+  "devDependencies": {
+    "chai": "^5.1.1",
+    "mocha": "^10.4.0"
+  }
+}

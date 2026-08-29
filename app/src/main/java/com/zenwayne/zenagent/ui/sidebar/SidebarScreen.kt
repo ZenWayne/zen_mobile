@@ -29,12 +29,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zenwayne.zenagent.data.Conversation
 import com.zenwayne.zenagent.data.UserProfile
+import com.zenwayne.zenagent.ui.TestTags
 import com.zenwayne.zenagent.ui.components.Avatar
 import com.zenwayne.zenagent.ui.theme.ZenColors
+
+private const val DRAWER_PREFIX = "conversation:"
 
 @Composable
 fun SidebarScreen(
@@ -49,7 +54,8 @@ fun SidebarScreen(
         modifier = modifier
             .fillMaxSize()
             .background(ZenColors.Ink)
-            .statusBarsPadding(),
+            .statusBarsPadding()
+            .semantics { contentDescription = TestTags.DRAWER },
     ) {
         ProfileSection(user)
         SearchBar()
@@ -74,7 +80,8 @@ private fun ProfileSection(user: UserProfile) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp)
+            .semantics { contentDescription = TestTags.DRAWER_PROFILE },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Avatar(glyph = user.initial, accent = ZenColors.Accent, size = 48.dp, cornerRadius = 24.dp)
@@ -94,7 +101,8 @@ private fun SearchBar() {
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(ZenColors.InkElevated)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .semantics { contentDescription = TestTags.DRAWER_SEARCH },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Filled.Search, contentDescription = null, tint = ZenColors.TextSecondary, modifier = Modifier.size(18.dp))
@@ -110,7 +118,8 @@ private fun ConversationRow(c: Conversation, onClick: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .semantics { contentDescription = "$DRAWER_PREFIX${c.agent.name}" },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Avatar(glyph = c.agent.glyph, accent = c.agent.accent)
@@ -157,7 +166,8 @@ private fun BottomSection(onNewChat: () -> Unit, onSettings: () -> Unit) {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .clickable(onClick = onSettings)
-                .padding(vertical = 10.dp),
+                .padding(vertical = 10.dp)
+                .semantics { contentDescription = TestTags.DRAWER_SETTINGS },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Icons.Outlined.Settings, contentDescription = null, tint = ZenColors.TextSecondary, modifier = Modifier.size(20.dp))
@@ -170,7 +180,8 @@ private fun BottomSection(onNewChat: () -> Unit, onSettings: () -> Unit) {
                 .clip(RoundedCornerShape(14.dp))
                 .background(ZenColors.Accent)
                 .clickable(onClick = onNewChat)
-                .padding(vertical = 14.dp),
+                .padding(vertical = 14.dp)
+                .semantics { contentDescription = TestTags.DRAWER_NEW_CHAT },
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {

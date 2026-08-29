@@ -36,6 +36,12 @@ android {
     buildFeatures {
         compose = true
     }
+    // The agentflow AAR bundles jni/arm64-v8a/*.so — ensure they land in the APK.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
@@ -51,4 +57,8 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     debugImplementation(libs.androidx.ui.tooling)
+    // ZenAgent on-device inference bridge (agentflow DSL + arm64 JNI lib).
+    implementation(files("libs/agentflow-android.aar"))
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

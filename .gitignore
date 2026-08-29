@@ -17,3 +17,13 @@ build/
 
 # Native build artifact (produced by Bazel, not checked in)
 app/src/main/jniLibs/
+
+# Local agent/tooling state (worktrees, local config)
+.omo/
+.sisyphus/
+
+# Built AAR (produced by zen/android-inference Bazel, not checked in)
+app/libs/
+
+# Node test dependencies (npm install regenerates)
+tests/appium/node_modules/
