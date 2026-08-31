@@ -13,7 +13,7 @@ enum class ToolStatus { Pending, Running, Done, Failed }
 enum class Role { User, Agent }
 
 /** Semantic tool icon kind, mapped to a Material icon at render time. */
-enum class ToolIcon { Search, MapPin, Hotel, Flight, Weather, Code, Warning, Generic }
+enum class ToolIcon { Search, MapPin, Hotel, Flight, Weather, Code, File, Warning, Generic }
 
 data class Agent(
     val id: String,
@@ -33,6 +33,7 @@ data class ToolCall(
     val icon: ToolIcon = ToolIcon.Generic,
     val errorHint: String? = null,   // e.g. "tool_error · API 503 — agent retried"
     val recovered: Boolean = false,  // tool failed then agent retried successfully
+    val toolCallId: String? = null,  // live-run correlation id
 )
 
 /** Summary of a delegated sub-agent run (FR-2.5). */

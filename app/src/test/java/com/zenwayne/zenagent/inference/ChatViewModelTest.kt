@@ -4,6 +4,7 @@ import com.zenwayne.zenagent.data.Conversation
 import com.zenwayne.zenagent.data.Role
 import com.zenwayne.zenagent.data.RunState
 import com.zenwayne.zenagent.data.SampleData
+import com.zenwayne.zenagent.data.ToolStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -34,10 +35,16 @@ class ChatViewModelTest {
         kotlinx.coroutines.Dispatchers.resetMain()
     }
 
-    private fun fakeClient(tokens: List<String>): InferenceClient = object : InferenceClient {
+    private fun fakeClient(
+        tokens: List<String>,
+        toolEvents: List<RunEvent> = emptyList(),
+    ): InferenceClient = object : InferenceClient {
         override fun verify(): Boolean = true
         override fun streamTokens(query: String): Flow<String> = flow {
             tokens.forEach { emit(it) }
+        }
+        override fun runAgentWithTools(query: String): Flow<RunEvent> = flow {
+            toolEvents.forEach { emit(it) }
         }
     }
 
@@ -89,6 +96,9 @@ class ChatViewModelTest {
             override fun streamTokens(query: String): Flow<String> = flow {
                 throw InferenceError.EngineInit(RuntimeException("boom"))
             }
+            override fun runAgentWithTools(query: String): Flow<RunEvent> = flow {
+                throw InferenceError.EngineInit(RuntimeException("boom"))
+            }
         }
         val vm = ChatViewModel(
             failing,
@@ -108,6 +118,7 @@ class ChatViewModelTest {
         val absent = object : InferenceClient {
             override fun verify(): Boolean = false
             override fun streamTokens(query: String): Flow<String> = flow { emit("x") }
+            override fun runAgentWithTools(query: String): Flow<RunEvent> = flow { emit(RunEvent.Final("x")) }
         }
         val vm = ChatViewModel(
             absent,
@@ -122,5 +133,31 @@ class ChatViewModelTest {
     private fun emptyConversation(): Conversation {
         val sample = SampleData.conversations.first()
         return sample.copy(messages = emptyList())
+    }
+
+    @Test
+    fun `tool call then return updates card and final text`() = runTest(dispatcher) {
+        val vm = ChatViewModel(
+            fakeClient(
+                tokens = emptyList(),
+                toolEvents = listOf(
+                    RunEvent.ToolCall("c1", "fs_read", """{"path":"a.txt"}"""),
+                    RunEvent.ToolReturn("c1", """{"content":"hi","bytes":2}"""),
+                    RunEvent.Final("done"),
+                ),
+            ),
+            initialConversation = emptyConversation(),
+            runDispatcher = dispatcher,
+        )
+        vm.sendWithTools("read a.txt")
+        advanceUntilIdle()
+
+        val conv = vm.selected.value
+        val cards = conv.messages.flatMap { it.toolCalls }
+        assertEquals(1, cards.size)
+        assertEquals("c1", cards[0].toolCallId)
+        assertEquals(ToolStatus.Done, cards[0].status)
+        assertEquals(RunState.Succeeded, conv.runState)
+        assertTrue(conv.messages.any { it.text == "done" })
     }
 }

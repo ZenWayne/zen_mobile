@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import android.content.Context
+import com.zenwayne.zenagent.data.ApprovalRequest
 import com.zenwayne.zenagent.data.Conversation
 import com.zenwayne.zenagent.data.Message
 import com.zenwayne.zenagent.data.Role
@@ -17,6 +18,7 @@ import com.zenwayne.zenagent.data.SampleData
 import com.zenwayne.zenagent.data.ToolCall
 import com.zenwayne.zenagent.data.ToolIcon
 import com.zenwayne.zenagent.data.ToolStatus
+import com.zenwayne.zenagent.tools.HostToolRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -35,6 +37,7 @@ class ChatViewModel(
     private val client: InferenceClient,
     initialConversation: Conversation = SampleData.conversations.first(),
     private val runDispatcher: CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
+    private val registry: HostToolRegistry? = null,
 ) : ViewModel() {
 
     private val _selected = MutableStateFlow(initialConversation)
@@ -125,6 +128,109 @@ class ChatViewModel(
                 ),
             )
         }
+    }
+
+    /**
+     * Tool-mode turn (spec §4.2/§5): collects the live [RunEvent] flow —
+     * tool calls open Running/awaiting-approval cards, tool returns resolve
+     * them, the final text lands whole (constrained mode has no token stream).
+     */
+    fun sendWithTools(text: String) {
+        val conv = _selected.value
+        val query = text.trim()
+        if (query.isEmpty() || streamingJob?.isActive == true) return
+        _selected.value = conv.copy(
+            runState = RunState.Running,
+            lastMessage = query,
+            messages = conv.messages + Message(id = newId("user"), role = Role.User, text = query),
+        )
+        streamingJob = viewModelScope.launch {
+            try {
+                client.runAgentWithTools(query).flowOn(runDispatcher).collect { ev ->
+                    when (ev) {
+                        is RunEvent.ToolCall -> onToolCall(ev)
+                        is RunEvent.ToolReturn -> onToolReturn(ev)
+                        is RunEvent.Final -> {
+                            appendMessage(
+                                Message(id = newId("agent"), role = Role.Agent, text = ev.text),
+                            )
+                            _selected.value = _selected.value.copy(runState = RunState.Succeeded)
+                        }
+                        is RunEvent.Token -> Unit
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                failRun(newId("agent"), e.message ?: "Inference failed")
+            }
+        }
+    }
+
+    /** Approve the pending gate for [toolCallId] (live tool-mode runs). */
+    fun approve(toolCallId: String) {
+        registry?.gates?.get(toolCallId)?.approve()
+    }
+
+    /** Deny the pending gate for [toolCallId] (live tool-mode runs). */
+    fun deny(toolCallId: String) {
+        registry?.gates?.get(toolCallId)?.deny()
+    }
+
+    private fun onToolCall(ev: RunEvent.ToolCall) {
+        val needsApproval = registry?.toolByName(ev.name)?.requiresApproval == true
+        val conv = _selected.value
+        _selected.value = conv.copy(
+            runState = if (needsApproval) RunState.AwaitingApproval else RunState.Running,
+            messages = conv.messages + Message(
+                id = newId("tool"),
+                role = Role.Agent,
+                toolCalls = listOf(
+                    ToolCall(
+                        name = ev.name,
+                        detail = ev.argsJson,
+                        status = if (needsApproval) ToolStatus.Pending else ToolStatus.Running,
+                        icon = if (ev.name.startsWith("fs_")) ToolIcon.File else ToolIcon.Code,
+                        toolCallId = ev.toolCallId,
+                    ),
+                ),
+                approval = if (needsApproval) {
+                    ApprovalRequest(tool = ev.name, args = ev.argsJson)
+                } else {
+                    null
+                },
+            ),
+        )
+    }
+
+    private fun onToolReturn(ev: RunEvent.ToolReturn) {
+        val conv = _selected.value
+        val failed = ev.resultJson.contains("\"error\"")
+        _selected.value = conv.copy(
+            runState = RunState.Running,
+            messages = conv.messages.map { msg ->
+                val resolvesThis = msg.toolCalls.any { it.toolCallId == ev.toolCallId }
+                msg.copy(
+                    toolCalls = msg.toolCalls.map { tc ->
+                        if (tc.toolCallId == ev.toolCallId) {
+                            tc.copy(
+                                status = if (failed) ToolStatus.Failed else ToolStatus.Done,
+                                resultLabel = if (failed) "Failed" else "Done",
+                                errorHint = if (failed) ev.resultJson.take(80) else null,
+                            )
+                        } else {
+                            tc
+                        }
+                    },
+                    approval = if (resolvesThis) null else msg.approval,
+                )
+            },
+        )
+    }
+
+    private fun appendMessage(message: Message) {
+        val conv = _selected.value
+        _selected.value = conv.copy(messages = conv.messages + message)
     }
 
     /**
@@ -229,12 +335,22 @@ class ChatViewModel(
     }
 
     companion object {
-        /** Factory wiring the real [AgentflowInferenceClient] with the app context. */
+        /**
+         * Factory wiring the real [AgentflowInferenceClient] with the app
+         * context. One [HostToolRegistry] instance is shared between the
+         * client (tool registration) and the VM (approval gates).
+         */
         fun factory(context: Context): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    ChatViewModel(AgentflowInferenceClient(context.applicationContext)) as T
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    val app = context.applicationContext
+                    val registry = HostToolRegistry(app)
+                    return ChatViewModel(
+                        AgentflowInferenceClient(app, registry),
+                        registry = registry,
+                    ) as T
+                }
             }
     }
 }
