@@ -122,10 +122,11 @@ interface HostTool {
     /**
      * Blocking invocation. Runs on a dedicated JVM worker thread owned by
      * the JNI bridge — never on the runner's single thread. Implementations
-     * may bridge to suspend internally. Return a JSON result string; return
-     * `{"error":"..."}` on failure.
+     * may bridge to suspend internally. [toolCallId] is the model-assigned
+     * call id (used to correlate an approval gate with its tool-call card).
+     * Return a JSON result string; return `{"error":"..."}` on failure.
      */
-    fun invoke(argsJson: String, cancel: CancellationSignal): String
+    fun invoke(toolCallId: String, argsJson: String, cancel: CancellationSignal): String
 }
 
 fun loadWorkflow(
@@ -136,6 +137,19 @@ fun loadWorkflow(
 ```
 
 **Native side** (`jni/agentflow_jni.cc`):
+
+Two small zen-side interface extensions carry `tool_call_id` end to end
+(the dispatch loop already holds it; today it is dropped):
+
+- `Tool::Invoke` gains a `std::string_view tool_call_id` parameter
+  (mechanical: `tool.h`, `native_fn_tool.*`, `mcp_tool_adapter.*`,
+  `delegate_tool.*`, `tool_registry.*`, `agent_node.cc` call sites).
+- `proto/trace_event.proto`: `ToolCallPayload` and `ToolReturnPayload`
+  gain `string tool_call_id = 3;`; `event.h` `EmitToolCall` /
+  `EmitToolReturn` gain overloads taking the id; `agent_node.cc` emits
+  the dispatch loop's `c.call_id`.
+
+Then:
 
 - For each `HostTool`, construct a `NativeFnTool` (schema from
   name/description/paramsJsonSchema) and register it into the `host_tools`
