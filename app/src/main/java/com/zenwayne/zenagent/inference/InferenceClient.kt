@@ -50,4 +50,12 @@ interface InferenceClient {
      * @throws InferenceError on model/engine/run failures.
      */
     fun streamTokens(query: String): Flow<String>
+
+    /**
+     * Runs a tool-mode turn: constrained decoding, live tool lifecycle events
+     * ([RunEvent.ToolCall]/[RunEvent.ToolReturn]), final text delivered whole
+     * (spec Q6-b — the constrained path has no token stream). Cancellation
+     * mirrors [streamTokens].
+     */
+    fun runAgentWithTools(query: String): Flow<RunEvent>
 }
