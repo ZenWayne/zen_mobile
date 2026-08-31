@@ -56,8 +56,8 @@ import com.zenwayne.zenagent.ui.theme.ZenColors
 fun ChatScreen(
     conversation: Conversation,
     onBack: () -> Unit,
-    onApprove: () -> Unit = {},
-    onDeny: () -> Unit = {},
+    onApprove: (String?) -> Unit = {},
+    onDeny: (String?) -> Unit = {},
     onStop: () -> Unit = {},
     onSend: (String) -> Unit = {},
     onRetry: () -> Unit = {},
@@ -177,8 +177,8 @@ private fun ChatHeader(conversation: Conversation, onBack: () -> Unit) {
 @Composable
 private fun MessageItem(
     msg: Message,
-    onApprove: () -> Unit,
-    onDeny: () -> Unit,
+    onApprove: (String?) -> Unit,
+    onDeny: (String?) -> Unit,
     onRetry: () -> Unit,
     onRestart: () -> Unit,
     onResume: () -> Unit,
@@ -205,7 +205,11 @@ private fun MessageItem(
                 )
             }
             msg.approval != null ->
-                ApprovalCard(msg.approval, onApprove = onApprove, onDeny = onDeny)
+                ApprovalCard(
+                    msg.approval,
+                    onApprove = { onApprove(msg.toolCalls.firstOrNull()?.toolCallId) },
+                    onDeny = { onDeny(msg.toolCalls.firstOrNull()?.toolCallId) },
+                )
             msg.subAgent != null -> SubAgentCard(msg.subAgent)
             msg.toolCalls.isNotEmpty() -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 msg.toolCalls.forEach { tool ->
