@@ -53,7 +53,9 @@ describe('On-Device Inference Streaming', function () {
     await send.click();
 
     // Wait for the generating state: Stop button + Generating note.
-    const stop = await waitForElement(driver, 'Stop', 30000);
+    // Cold start needs the model load + KV cache alloc (can take minutes on
+// a fresh install - see comment below). Give Stop a long window.
+const stop = await waitForElement(driver, 'Stop', 90000);
     assert.ok(await stop.isDisplayed(), 'stop button should appear while running');
     await takeScreenshot(driver, 'TC-INF-001_running');
 

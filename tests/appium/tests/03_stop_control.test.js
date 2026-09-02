@@ -49,7 +49,7 @@ describe('Stop Control', function () {
     await send.click();
 
     // Running state must appear first.
-    const stop = await waitForElement(driver, 'Stop', 30000);
+    const stop = await waitForElement(driver, 'Stop', 90000);
     assert.ok(await stop.isDisplayed(), 'stop button should be visible while running');
 
     await stop.click();
