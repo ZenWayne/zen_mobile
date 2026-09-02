@@ -40,7 +40,10 @@ describe('Stop Control', function () {
     await input.click();
     const textField = await driver.$('//android.widget.EditText');
     await textField.setValue('Tell me a long story about the history of tea.');
-    await dismissKeyboard(driver);
+    // Keyboard stays up: the Compose input bar sits above it and the Send
+    // button is visible. hideKeyboard 500s on this device's IME and the
+    // back-key fallback would navigate the app away from the chat.
+
 
     const send = await waitForElement(driver, 'Send', 10000);
     await send.click();

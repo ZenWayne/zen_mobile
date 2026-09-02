@@ -118,6 +118,7 @@ module.exports = {
   swipeUp,
   takeScreenshot,
   resetToChat,
+  dismissKeyboard,
   SCREENSHOT_DIR,
 };
 

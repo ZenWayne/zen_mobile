@@ -45,7 +45,10 @@ describe('On-Device Inference Streaming', function () {
     await textField.setValue('What is 2+2? Answer in one word.');
 
     // Hide keyboard, then tap send (btn_send label on the Icon contentDescription).
-    await dismissKeyboard(driver);
+    // Keyboard stays up: the Compose input bar sits above it and the Send
+    // button is visible. hideKeyboard 500s on this device's IME and the
+    // back-key fallback would navigate the app away from the chat.
+
     const send = await waitForElement(driver, 'Send', 10000);
     await send.click();
 
