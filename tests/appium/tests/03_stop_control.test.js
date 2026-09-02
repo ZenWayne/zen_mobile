@@ -13,7 +13,7 @@
 const { remote } = require('webdriverio');
 const { assert } = require('chai');
 const { getRemoteOptions, resolveDeviceCaps } = require('../config/capabilities');
-const { waitForElement, takeScreenshot, resetToChat } = require('../helpers/gestures');
+const { waitForElement, takeScreenshot, resetToChat, dismissKeyboard } = require('../helpers/gestures');
 
 describe('Stop Control', function () {
   this.timeout(180000);
@@ -40,7 +40,7 @@ describe('Stop Control', function () {
     await input.click();
     const textField = await driver.$('//android.widget.EditText');
     await textField.setValue('Tell me a long story about the history of tea.');
-    await driver.hideKeyboard();
+    await dismissKeyboard(driver);
 
     const send = await waitForElement(driver, 'Send', 10000);
     await send.click();

@@ -15,7 +15,7 @@
 const { remote } = require('webdriverio');
 const { assert } = require('chai');
 const { getRemoteOptions, resolveDeviceCaps } = require('../config/capabilities');
-const { waitForElement, descXPath, textXPath, takeScreenshot, resetToChat } = require('../helpers/gestures');
+const { waitForElement, descXPath, textXPath, takeScreenshot, resetToChat, dismissKeyboard } = require('../helpers/gestures');
 
 describe('On-Device Inference Streaming', function () {
   this.timeout(180000);
@@ -45,7 +45,7 @@ describe('On-Device Inference Streaming', function () {
     await textField.setValue('What is 2+2? Answer in one word.');
 
     // Hide keyboard, then tap send (btn_send label on the Icon contentDescription).
-    await driver.hideKeyboard();
+    await dismissKeyboard(driver);
     const send = await waitForElement(driver, 'Send', 10000);
     await send.click();
 

@@ -12,13 +12,20 @@
 const { remote } = require('webdriverio');
 const { assert } = require('chai');
 const { getRemoteOptions, resolveDeviceCaps } = require('../config/capabilities');
-const { waitForElement, descXPath, textXPath, takeScreenshot } = require('../helpers/gestures');
+const { waitForElement, descXPath, textXPath, takeScreenshot, resetToChat } = require('../helpers/gestures');
 
 async function openDrawer(driver) {
   const back = await waitForElement(driver, 'Back', 15000);
   await back.click();
   const drawer = await waitForElement(driver, 'sidebar_drawer', 10000);
   assert.ok(await drawer.isDisplayed(), 'drawer should open');
+}
+
+// Fallback: open the drawer by tapping the header hamburger button directly
+// (some screens' Back is an in-chat back rather than the drawer toggle).
+async function openDrawerByToggle(driver) {
+  const toggle = await waitForElement(driver, descXPath('sidebar_drawer'), 10000);
+  await toggle.click();
 }
 
 async function selectConversation(driver, agentName) {
@@ -38,7 +45,7 @@ describe('Conversation Design States', function () {
 
   before(async function () {
     driver = await remote(getRemoteOptions(resolveDeviceCaps()));
-    await driver.activateApp('com.zenwayne.zenagent');
+    await resetToChat(driver);
   });
 
   after(async function () {
@@ -147,7 +154,7 @@ describe('Conversation Design States', function () {
   });
 
   it('TC-STATES-006: T6 restore-error full screen via corrupt entry', async function () {
-    const close = await waitForElement(driver, 'Close', 10000);
+    const close = await waitForElement(driver, 't5_close', 10000);
     await close.click(); // leave T5 → chat screen
     const back = await waitForElement(driver, 'Back', 10000);
     await back.click(); // open drawer
