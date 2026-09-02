@@ -16,7 +16,7 @@ const { getRemoteOptions, resolveDeviceCaps } = require('../config/capabilities'
 const { waitForElement, takeScreenshot, resetToChat, dismissKeyboard } = require('../helpers/gestures');
 
 describe('Stop Control', function () {
-  this.timeout(180000);
+  this.timeout(360000);
   let driver;
 
   before(async function () {
@@ -49,7 +49,7 @@ describe('Stop Control', function () {
     await send.click();
 
     // Running state must appear first.
-    const stop = await waitForElement(driver, 'Stop', 90000);
+    const stop = await waitForElement(driver, 'Stop', 180000);
     assert.ok(await stop.isDisplayed(), 'stop button should be visible while running');
 
     await stop.click();

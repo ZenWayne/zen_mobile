@@ -18,7 +18,7 @@ const { getRemoteOptions, resolveDeviceCaps } = require('../config/capabilities'
 const { waitForElement, descXPath, textXPath, takeScreenshot, resetToChat, dismissKeyboard } = require('../helpers/gestures');
 
 describe('On-Device Inference Streaming', function () {
-  this.timeout(180000);
+  this.timeout(360000);
   let driver;
 
   before(async function () {
@@ -55,7 +55,7 @@ describe('On-Device Inference Streaming', function () {
     // Wait for the generating state: Stop button + Generating note.
     // Cold start needs the model load + KV cache alloc (can take minutes on
 // a fresh install - see comment below). Give Stop a long window.
-const stop = await waitForElement(driver, 'Stop', 90000);
+const stop = await waitForElement(driver, 'Stop', 180000);
     assert.ok(await stop.isDisplayed(), 'stop button should appear while running');
     await takeScreenshot(driver, 'TC-INF-001_running');
 

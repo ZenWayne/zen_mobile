@@ -154,10 +154,11 @@ describe('Conversation Design States', function () {
   });
 
   it('TC-STATES-006: T6 restore-error full screen via corrupt entry', async function () {
-    // Dismiss the T5 full screen with the back key (its close icon's a11y
-    // node is flaky on this device), then continue to the drawer.
-    await driver.pressKeyCode(4);
-    await new Promise((r) => setTimeout(r, 1200));
+    // Dismiss the T5 full screen: its X icon's a11y node is flaky on this
+    // device, so tap it by position (top-left of the full-screen header).
+    const pos = await driver.getWindowSize();
+    await driver.touchAction([{ action: 'tap', x: Math.round(pos.width * 0.052), y: Math.round(pos.height * 0.100) }]);
+    await new Promise((r) => setTimeout(r, 1500));
     const back = await waitForElement(driver, 'Back', 10000);
     await back.click(); // open drawer
     await waitForElement(driver, 'sidebar_drawer', 10000);
