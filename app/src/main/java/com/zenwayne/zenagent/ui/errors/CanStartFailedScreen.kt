@@ -140,7 +140,7 @@ private fun TopBar(onClose: () -> Unit) {
     ) {
         Icon(
             Icons.Filled.Close,
-            contentDescription = "Close",
+            contentDescription = TestTags.T5_CLOSE,
             tint = ZenColors.TextPrimary,
             modifier = Modifier
                 .size(24.dp)
