@@ -86,30 +86,29 @@ async function takeScreenshot(driver, name) {
  * session sequence and cannot assume the previous suite left the chat screen.
  */
 async function resetToChat(driver) {
+  // Most robust reset: terminate the process (kills any persisted route —
+  // T5/T6 full screens, selected conversation) and relaunch. The app's
+  // default state is the first sample chat, which every run-dependent suite
+  // can then drive deterministically.
   await driver.terminateApp('com.zenwayne.zenagent');
-  await new Promise((r) => setTimeout(r, 800));
+  await new Promise((r) => setTimeout(r, 1200));
   await driver.activateApp('com.zenwayne.zenagent');
   await new Promise((r) => setTimeout(r, 2500));
 
+  // Belt-and-braces: if a full-screen state (restored route) is still up,
+  // dismiss it via its exact test tags. NOTE: T5's close button tag is
+  // "t5_close" (lowercase) — matching "Close" never fires.
   const isT6 = await driver.$('//*[contains(@content-desc,"t6_restore_error")]').isExisting();
   if (isT6) {
     const fresh = await driver.$('//*[contains(@content-desc,"t6_start_fresh")]');
     if (await fresh.isExisting()) await fresh.click();
     await new Promise((r) => setTimeout(r, 1200));
   }
-
   const isT5 = await driver.$('//*[contains(@content-desc,"t5_cant_start")]').isExisting();
   if (isT5) {
-    const close = await driver.$('//*[contains(@content-desc,"Close")]');
+    const close = await driver.$('//*[contains(@content-desc,"t5_close")]');
     if (await close.isExisting()) await close.click();
     await new Promise((r) => setTimeout(r, 1200));
-  }
-
-  // Close drawer if open (Back first opens it, app Back dismisses — detect by Back icon).
-  const onChat = await driver.$('//*[contains(@content-desc,"Back")]').isExisting();
-  if (!onChat) {
-    await driver.activateApp('com.zenwayne.zenagent');
-    await new Promise((r) => setTimeout(r, 1500));
   }
 }
 
@@ -132,7 +131,7 @@ async function typeAndCommit(driver, textField, text) {
     }
     await new Promise((r) => setTimeout(r, 300));
   }
-  await driver.hideKeyboard();
+  await dismissKeyboard(driver);
 }
 
 module.exports = {
@@ -146,5 +145,25 @@ module.exports = {
   takeScreenshot,
   resetToChat,
   typeAndCommit,
+  dismissKeyboard,
   SCREENSHOT_DIR,
 };
+
+/**
+ * Robust keyboard dismissal: hideKeyboard can 500 on pinyin/IME keyboards
+ * ("The software keyboard cannot be hidden"). Fall back to the device back
+ * key, which the chat input treats as dismiss-first.
+ */
+async function dismissKeyboard(driver) {
+  try {
+    await driver.hideKeyboard();
+  } catch (e) {
+    try {
+      await driver.pressKeyCode(4); // KEYCODE_BACK
+      await new Promise((r) => setTimeout(r, 500));
+      await driver.hideKeyboard();
+    } catch (e2) {
+      // last resort: ignore — send button may still be reachable.
+    }
+  }
+}
