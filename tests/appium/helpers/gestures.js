@@ -107,6 +107,28 @@ async function resetToChat(driver) {
   }
 }
 
+/**
+ * Type into a Compose text field and wait until the text is committed.
+ *
+ * Compose commits IME text asynchronously; hiding the keyboard right after
+ * setValue drops the composing text and the field ends up empty (send then
+ * no-ops). Poll the field's text until it matches, then hide the keyboard.
+ */
+async function typeAndCommit(driver, textField, text) {
+  await textField.click();
+  await textField.setValue(text);
+  const deadline = Date.now() + 10000;
+  for (;;) {
+    const current = await textField.getText();
+    if (current === text) break;
+    if (Date.now() > deadline) {
+      throw new Error(`text not committed: got '${current}' want '${text}'`);
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  await driver.hideKeyboard();
+}
+
 module.exports = {
   waitForElement,
   waitForElementToDisappear,
@@ -117,5 +139,6 @@ module.exports = {
   swipeUp,
   takeScreenshot,
   resetToChat,
+  typeAndCommit,
   SCREENSHOT_DIR,
 };

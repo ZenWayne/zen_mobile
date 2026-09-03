@@ -31,12 +31,6 @@ const androidCommonCaps = {
   'appium:noReset': true,
   'appium:fullReset': false,
 
-  // Compose text fields surface as android.view.View (not EditText) — setValue
-  // fails on them. Use click-to-focus + driver.keys(); the Appium UnicodeIME
-  // (io.appium.settings, preinstalled) types raw text with no IME conversion.
-  'appium:unicodeKeyboard': true,
-  'appium:resetKeyboard': true,
-
   'appium:newCommandTimeout': 120,
   'appium:autoLaunch': false,
 
