@@ -35,6 +35,7 @@ stage-model:
 # not enough when suites write files / persist caches.
 reset-device: stage-model
 	adb -s $(DEVICES) shell pm clear com.zenwayne.zenagent
+	@sleep 2
 	adb -s $(DEVICES) shell "mkdir -p \$$(dirname $(MODEL_DEV)) \
 	  && cp $(MODEL_STAGE) $(MODEL_DEV) \
 	  && chmod 644 $(MODEL_DEV) \
