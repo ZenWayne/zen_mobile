@@ -43,7 +43,8 @@ make start-all-bc72                  # 启动 Appium + 全量套件（真机）
 - 无标签时回退 `textXPath(text)` / `descXPath(label)`（`tests/appium/helpers/gestures.js`）。
 - 文本输入用 `element.setValue(...)`（绕过 IME，杜绝中文转写）。
 - 新测试文件：`tests/appium/tests/NN_<name>.test.js`，仿既有用例的 `before/afterEach`（失败自动截图到 `/tmp/zenagent-shots`）。
-- **每测试进程级隔离**：`resetToChat` 先 `terminateApp` 再拉起（会话状态仅内存，新进程=干净 ViewModel，回到默认 c1）。**不清理应用数据/模型缓存**（`noReset:true` 保热缓存；模型 `.xnnpack_cache` 刻意保留以提速）。
+- **每测试进程级隔离**：`resetToChat` 先 `terminateApp` 再拉起（会话状态仅内存，新进程=干净 ViewModel，回到默认 c1）。
+- **整套件开跑前清空应用数据**（`make e2e` 或 `make reset-device`）：`pm clear` 清空全部 App 数据，**仅保留模型**——模型先暂存在 `/data/local/tmp`（App 数据之外，`pm clear` 不销毁），清空后从暂存区恢复并重建 workspace 测试文件（`hello.txt`）。测试不得依赖上一次运行遗留的任何文件/缓存状态。
 - 推理类套件前置条件：真机 bc72 + arm64 `.so` 在 AAR 中 + 模型已推送至
   `/sdcard/Android/data/com.zenwayne.zenagent/files/models/gemma-4-E2B-it.litertlm`。
 

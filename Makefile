@@ -11,6 +11,42 @@ DEVICES := QV7808CA8G
 AAR_SRC := /home/wayne/tools/zen/android-inference/build/outputs/aar/android-inference-debug.aar
 AAR_DST := app/libs/agentflow-android.aar
 
+# On-device model fixture (host source + device staging path). The staging
+# copy lives OUTSIDE app data (/data/local/tmp) so `pm clear` never destroys
+# it — reset-device restores the model from staging instead of re-pushing
+# 2.6 GB over USB.
+MODEL_SRC := /home/wayne/tools/zen/models/gemma-4-E2B-it.litertlm
+MODEL_STAGE := /data/local/tmp/gemma-4-E2B-it.litertlm
+MODEL_DEV := /sdcard/Android/data/com.zenwayne.zenagent/files/models/gemma-4-E2B-it.litertlm
+WORKSPACE_DEV := /sdcard/Android/data/com.zenwayne.zenagent/files/workspace
+
+# ── Device reset (test hygiene) ───────────────────────────────────────────────
+
+.PHONY: stage-model reset-device e2e
+
+# One-time: stage the model on-device outside app data.
+stage-model:
+	@adb -s $(DEVICES) shell "test -s $(MODEL_STAGE)" 2>/dev/null || \
+		adb -s $(DEVICES) push $(MODEL_SRC) $(MODEL_STAGE)
+	@echo "→ model staged at $(MODEL_STAGE)"
+
+# Clear ALL app data, then restore ONLY the model + seed the workspace fixture.
+# Tests must start from a clean slate — in-memory state reset (resetToChat) is
+# not enough when suites write files / persist caches.
+reset-device: stage-model
+	adb -s $(DEVICES) shell pm clear com.zenwayne.zenagent
+	adb -s $(DEVICES) shell "mkdir -p \$$(dirname $(MODEL_DEV)) \
+	  && cp $(MODEL_STAGE) $(MODEL_DEV) \
+	  && chmod 644 $(MODEL_DEV) \
+	  && mkdir -p $(WORKSPACE_DEV) \
+	  && echo 'ZenAgent workspace smoke test file.' > $(WORKSPACE_DEV)/hello.txt \
+	  && ls -la \$$(dirname $(MODEL_DEV))"
+	@echo "→ device reset: app data cleared, model restored, workspace seeded"
+
+# Full on-device E2E from a clean app-data state (Appium must be running).
+e2e: reset-device
+	cd $(APPIUM_DIR) && npm run test:all
+
 # ── Build & install ───────────────────────────────────────────────────────────
 
 .PHONY: aar build install install-bc72 build-install
