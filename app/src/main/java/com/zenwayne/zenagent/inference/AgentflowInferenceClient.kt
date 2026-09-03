@@ -70,8 +70,7 @@ class AgentflowInferenceClient(
           "agents": {
             "main": {
               "system_prompt": "You are Zen, an on-device assistant. You can read, write and list files in the workspace with fs_read/fs_write/fs_list. Reply concisely in the user's language.",
-              "model": {"max_output_tokens": 512},
-              "constrained_tool_calls": true,
+              "model": {"max_output_tokens": 512, "constrained_tool_calls": true},
               "tools": ["fs_read", "fs_write", "fs_list"]
             }
           },
