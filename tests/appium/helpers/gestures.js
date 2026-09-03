@@ -74,6 +74,10 @@ async function takeScreenshot(driver, name) {
 
 /**
  * Force the app into a clean chat screen regardless of prior suite state:
+ *   - Kill the process first: conversation state is in-memory only, so a
+ *     fresh process = clean ViewModel (default c1 conversation, empty input,
+ *     no leftover run banners). This is the per-test isolation that makes
+ *     suites order-independent.
  *   - If a T5/T6 full screen is up, dismiss it (Close / Start fresh / Back).
  *   - If the drawer is open, close it.
  *   - If still not on chat, relaunch the activity.
@@ -82,8 +86,10 @@ async function takeScreenshot(driver, name) {
  * session sequence and cannot assume the previous suite left the chat screen.
  */
 async function resetToChat(driver) {
+  await driver.terminateApp('com.zenwayne.zenagent');
+  await new Promise((r) => setTimeout(r, 800));
   await driver.activateApp('com.zenwayne.zenagent');
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 2500));
 
   const isT6 = await driver.$('//*[contains(@content-desc,"t6_restore_error")]').isExisting();
   if (isT6) {
