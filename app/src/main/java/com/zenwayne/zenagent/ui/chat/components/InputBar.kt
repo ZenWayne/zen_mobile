@@ -86,13 +86,14 @@ fun InputBar(
                     .weight(1f)
                     .clip(RoundedCornerShape(20.dp))
                     .background(ZenColors.FieldBackground)
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
-                    .semantics { contentDescription = TestTags.INPUT_FIELD },
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
                 BasicTextField(
                     value = text,
                     onValueChange = { text = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = TestTags.INPUT_FIELD },
                     enabled = !running,
                     textStyle = TextStyle(color = ZenColors.TextPrimary, fontSize = 15.sp),
                     singleLine = true,

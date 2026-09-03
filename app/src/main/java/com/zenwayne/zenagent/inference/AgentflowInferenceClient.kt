@@ -1,22 +1,32 @@
 package com.zenwayne.zenagent.inference
 
 import agentflow.dsl.JsonWorkflow
+import agentflow.dsl.RunEventCallback
+import agentflow.dsl.cancelRun
+import agentflow.dsl.freeCancelHandle
 import agentflow.dsl.loadWorkflow
+import agentflow.dsl.newCancelHandle
 import android.content.Context
+import com.zenwayne.zenagent.tools.HostToolRegistry
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.withContext
 
 /**
  * Production [InferenceClient] backed by the `agentflow` DSL over JNI
  * (spec §4). Resolves the model under `getExternalFilesDir("models")` and
  * streams via [JsonWorkflow.streamTokens].
  *
- * The workflow here is a minimal single-agent JSON (no tools/approval in this
- * slice — spec §5). Streaming uses the unconstrained decoding path, so tool
- * call constraints are off by design.
+ * Tool mode ([runAgentWithTools]) runs the constrained path with the fs tools
+ * registered; tool lifecycle events stream live, final text arrives whole
+ * (spec Q6-b).
  */
 class AgentflowInferenceClient(
     private val context: Context,
+    private val toolRegistry: HostToolRegistry = HostToolRegistry(context),
     private val modelFileName: String = MODEL_FILE_NAME,
 ) : InferenceClient {
 
@@ -50,6 +60,28 @@ class AgentflowInferenceClient(
         loadWorkflow(modelPath, workflowJson)
     }
 
+    /** Tool-mode workflow JSON (spec §4.3): constrained decoding + fs tools. */
+    private val toolsWorkflowJson: String = """
+        {
+          "schema_version": 1,
+          "name": "zenagent-tools",
+          "version": "v2",
+          "state": {"kind": "dynamic_json", "fields": {}},
+          "agents": {
+            "main": {
+              "system_prompt": "You are Zen, an on-device assistant with file tools in a workspace directory.\nTools:\n- fs_read(path): read a text file's contents.\n- fs_write(path, content): create or overwrite a text file. The user must approve every write.\n- fs_list(path): list files and folders in a directory; use \".\" for the workspace root.\nRules:\n- Asked to read or show a file → fs_read. Asked to create, save, or write something to a file → fs_write. Asked what files exist → fs_list.\n- After a tool result, confirm briefly what you did.\n- Reply concisely in the user's language.",
+              "model": {"max_output_tokens": 512, "constrained_tool_calls": true},
+              "tools": ["fs_read", "fs_write", "fs_list"]
+            }
+          },
+          "main": "main"
+        }
+    """.trimIndent()
+
+    private val toolsWorkflow: JsonWorkflow by lazy {
+        loadWorkflow(modelPath, toolsWorkflowJson, toolRegistry.tools())
+    }
+
     override fun verify(): Boolean {
         val model = File(modelPath)
         return model.exists() && model.isFile
@@ -63,6 +95,31 @@ class AgentflowInferenceClient(
         workflow.streamTokens(query)
     } catch (e: Throwable) {
         throw mapError(e)
+    }
+
+    override fun runAgentWithTools(query: String): Flow<RunEvent> = callbackFlow {
+        val cancelId = newCancelHandle()
+        val callback = object : RunEventCallback {
+            override fun onToolCall(toolCallId: String, name: String, argsJson: String) {
+                trySend(RunEvent.ToolCall(toolCallId, name, argsJson))
+            }
+
+            override fun onToolReturn(toolCallId: String, resultJson: String) {
+                trySend(RunEvent.ToolReturn(toolCallId, resultJson))
+            }
+        }
+        try {
+            val reply = withContext(Dispatchers.IO) {
+                toolsWorkflow.runConstrained(query, callback, cancelId)
+            }
+            trySend(RunEvent.Final(reply))
+            close()
+        } catch (e: Throwable) {
+            close(mapError(e))
+        } finally {
+            freeCancelHandle(cancelId)
+        }
+        awaitClose { cancelRun(cancelId) }
     }
 
     private fun mapError(e: Throwable): Throwable = when (e) {

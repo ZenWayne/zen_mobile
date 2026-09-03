@@ -111,10 +111,14 @@ fun AppRoot() {
         ChatScreen(
             conversation = selected,
             onBack = { scope.launch { drawerState.open() } },
-            onApprove = { chatViewModel.approveGate() },
-            onDeny = { chatViewModel.denyGate() },
+            onApprove = { toolCallId ->
+                if (toolCallId != null) chatViewModel.approve(toolCallId) else chatViewModel.approveGate()
+            },
+            onDeny = { toolCallId ->
+                if (toolCallId != null) chatViewModel.deny(toolCallId) else chatViewModel.denyGate()
+            },
             onStop = { chatViewModel.stop() },
-            onSend = { text -> chatViewModel.send(text) },
+            onSend = { text -> chatViewModel.sendWithTools(text) },
             onRetry = { },
             onRestart = { },
             onResume = { },

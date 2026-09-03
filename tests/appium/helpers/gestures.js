@@ -74,6 +74,10 @@ async function takeScreenshot(driver, name) {
 
 /**
  * Force the app into a clean chat screen regardless of prior suite state:
+ *   - Kill the process first: conversation state is in-memory only, so a
+ *     fresh process = clean ViewModel (default c1 conversation, empty input,
+ *     no leftover run banners). This is the per-test isolation that makes
+ *     suites order-independent.
  *   - If a T5/T6 full screen is up, dismiss it (Close / Start fresh / Back).
  *   - If the drawer is open, close it.
  *   - If still not on chat, relaunch the activity.
@@ -108,6 +112,28 @@ async function resetToChat(driver) {
   }
 }
 
+/**
+ * Type into a Compose text field and wait until the text is committed.
+ *
+ * Compose commits IME text asynchronously; hiding the keyboard right after
+ * setValue drops the composing text and the field ends up empty (send then
+ * no-ops). Poll the field's text until it matches, then hide the keyboard.
+ */
+async function typeAndCommit(driver, textField, text) {
+  await textField.click();
+  await textField.setValue(text);
+  const deadline = Date.now() + 10000;
+  for (;;) {
+    const current = await textField.getText();
+    if (current === text) break;
+    if (Date.now() > deadline) {
+      throw new Error(`text not committed: got '${current}' want '${text}'`);
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  await dismissKeyboard(driver);
+}
+
 module.exports = {
   waitForElement,
   waitForElementToDisappear,
@@ -118,6 +144,7 @@ module.exports = {
   swipeUp,
   takeScreenshot,
   resetToChat,
+  typeAndCommit,
   dismissKeyboard,
   SCREENSHOT_DIR,
 };
