@@ -5,6 +5,9 @@
 - Kotlin + Jetpack Compose (Material 3) Android 客户端，on-device AI agent 聊天应用。
 - 原生推理引擎 `agentflow` 在 **zen 仓库**（C++/JNI），本仓库以 AAR 消费：`app/libs/agentflow-android.aar`（构建产物，git-ignored）。
 - 工具链：Gradle 8.13（wrapper 锁定）、AGP 8.7.3、Kotlin 2.0.21、Compose BOM 2024.12.01；minSdk 26 / targetSdk 35；**仅 arm64-v8a**（真机 XQ-BC72）。
+- **Chaquopy 17.0.0**（`python_run` 工具的内嵌 CPython）带来两条构建约束：
+  - **构建机必须有与目标同 major.minor 的 python3**。当前 `chaquopy.defaultConfig.version = "3.14"`，跟随本机默认 `python3`。换机器若没有 3.14，改这个值去对齐 `python3 --version`（Chaquopy 17 支持 3.10–3.14），否则 configure 阶段直接失败。
+  - **配置缓存必须关闭**（`gradle.properties` 已置 `org.gradle.configuration-cache=false`）。Chaquopy 在 configure 阶段起 buildPython 子进程，且 `BuildPackagesTask` 持有无法序列化的 lazy（store 时报 `env/<variant>/lib does not exist`）。`--configuration-cache-problems=warn` 绕不过去。
 - 构建：`./gradlew :app:assembleDebug`；安装：`./gradlew :app:installDebug`。
 
 ## 测试规范（核心）
@@ -13,7 +16,7 @@
 
 | 层 | 位置 | 跑法 | 依赖 |
 |---|---|---|---|
-| JVM 单元测试 | `app/src/test/` | `./gradlew :app:testDebugUnitTest --tests <类名>` | 无（纯 JVM，禁止真机/模型） |
+| JVM 单元测试 | `app/src/test/` | `./gradlew :app:testDebugUnitTest --tests <类名>` | 无（纯 JVM，禁止真机/模型；Chaquopy/SAF 都在接口后面 mock 掉） |
 | Appium E2E | `tests/appium/` | `make <suite>-<device>`（见下） | 真机 bc72 或 emulator |
 | zen 宿主测试 | zen 工作树 `//tests/unit` + `kotlin/` | bazel test / gradle test | zen 工作树；kotlin 测试需 `MODEL_PATH` |
 
@@ -30,7 +33,7 @@ make <suite>-<device>                # 跑单个套件
 make start-all-bc72                  # 启动 Appium + 全量套件（真机）
 ```
 
-- suite：`smoke | states | inference | stop | approval | all`
+- suite：`smoke | states | inference | stop | approval | toolmode | toolmode-se | python | shared | all`
 - device：`bc72`（QV7808CA8G，arm64 + 模型，可跑推理）| `emu`（x86_64，仅 UI 套件 smoke/states/approval）
 - 等价 npm 脚本：`cd tests/appium && npm run test:inference` 等；首次需 `cd tests/appium && npm install`
 - 能力配置：`tests/appium/config/capabilities.js`（`autoLaunch:false`，`noReset:true`）
@@ -47,6 +50,9 @@ make start-all-bc72                  # 启动 Appium + 全量套件（真机）
 - **整套件开跑前清空应用数据**（`make e2e` 或 `make reset-device`）：`pm clear` 清空全部 App 数据，**仅保留模型**——模型先暂存在 `/data/local/tmp`（App 数据之外，`pm clear` 不销毁），清空后从暂存区恢复并重建 workspace 测试文件（`hello.txt`）。测试不得依赖上一次运行遗留的任何文件/缓存状态。
 - 推理类套件前置条件：真机 bc72 + arm64 `.so` 在 AAR 中 + 模型已推送至
   `/sdcard/Android/data/com.zenwayne.zenagent/files/models/gemma-4-E2B-it.litertlm`。
+- **`/shared` 的授权步骤是手工的**：`08_shared_storage.test.js` 只覆盖设置页入口和未授权
+  错误路径。真正点系统文件选择器要驱动另一个 package 的 UI（各 OEM/版本布局不同），
+  自动化必碎——授权后的读写属于**手工验收项**，别为它写 Appium。
 
 ### TDD 要求
 
@@ -63,6 +69,38 @@ make start-all-bc72                  # 启动 Appium + 全量套件（真机）
   （`Token | ToolCall | ToolReturn | Final`）。**工具模式文本不流式**（LiteRT-LM 约束解码无流式变体，spec Q6-b）。
 - 工具失败 = `{"error": "..."}` 结果串（模型可见、可自愈），不是 run failure；`user_denied`/`cancelled`/`timeout` 同理。
 - 沙箱：`getExternalFilesDir("workspace")`；读 512KB 上限、列 200 条上限、原子写（临时文件+rename）。
+- **工具参数必须解码**：约束解码给的是 JSON 串，字符串值是转义过的。`tools/JsonArgs.kt`
+  的 `extractPath/extractContent/extractCode` 统一走 `jsonUnescape`——直接把 `\n`
+  原样写进文件或喂给 Python 是 bug（`JsonArgsTest` 盯着这条）。
+
+### `python_run`（P2，Chaquopy）
+
+- 分层：`PythonEngine`（接口）→ `ChaquopyEngine`（真实 CPython）→ `PythonRunner`
+  （队列/超时/上限）→ `PythonRunTool`（HostTool + 审批门）。JVM 单测用假 engine，
+  测试机上不需要 Chaquopy。
+- **单解释器 → 单 worker 串行**：这就是本工具对并行 dispatch 并发契约的答案。
+- **超时是尽力而为**：CPython 无法中断，超时后 worker 被 detach（继续以 daemon 线程跑），
+  换新 worker 顶上，调用方拿 `{"error":"timeout"}`。超时窗口含排队时间。
+- **无沙箱（已知并接受，spec §9.3）**：Python 拥有 App 全部权限（含 `java` 模块）。
+  缓解手段只有：审批门 + 串行队列 + 100KB 代码上限 + 尽力超时。
+- `Python.start()` 延迟到首次执行（在 worker 线程上），不放 `Application.onCreate`——
+  否则每次冷启动都要付这个钱，而首次 `python_run` 本来就卡在审批门后面。
+- 执行/捕获在 `app/src/main/python/zen_exec.py`：重定向 `sys.stdout/stderr`，
+  代码自身的异常打成 traceback 进 stderr（模型可读可自愈），不算工具失败。
+
+### `/shared` 共享存储（P3，SAF）
+
+- `FsBackend` 是 fs 三工具面对的接口；`FsWorkspace`（java.io 沙箱）和
+  `SafSharedStorage`（SAF 树）各实现一份，`FsRouter` 按前缀分流。
+- **默认落沙箱**：只有以绝对段 `/shared` 打头才走授权树。模型忘了前缀 → 写进无害的沙箱，
+  这是安全的方向。
+- 授权：设置页 →「共享存储」→ `ACTION_OPEN_DOCUMENT_TREE` → `takePersistableUriPermission`；
+  URI 存 SharedPreferences，**每次工具调用重新校验实时授权**，所以在系统设置里撤销会立刻生效。
+- **containment 靠结构校验**：`DocumentFile` 没有 canonical path，无法像沙箱那样前缀比对。
+  `sharedSegments()` 逐段拒绝 `..` 与控制字符（`SharedPathTest` 盯着）。
+- **SAF 写不是原子的**：没有 rename-into-place，只能 `"wt"` 截断写——与沙箱的原子写不同，
+  这条差异是刻意的。
+- 未授权时工具返回 `{"error":"shared_not_authorized"}`。
 
 ## AAR 更新流程（跨仓库）
 
