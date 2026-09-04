@@ -15,6 +15,7 @@
     "test:toolmode": "DEVICE=bc72 npx mocha tests/05_tool_mode_fs.test.js --timeout 480000 --exit",
     "test:toolmode-se": "DEVICE=bc72 npx mocha tests/06_tool_mode_fs_side_effects.test.js --timeout 480000 --exit",
     "test:python": "DEVICE=bc72 npx mocha tests/07_tool_mode_python.test.js --timeout 600000 --exit",
+    "test:shared": "DEVICE=bc72 npx mocha tests/08_shared_storage.test.js --timeout 480000 --exit",
     "test:all": "DEVICE=bc72 npx mocha 'tests/**/*.test.js' --timeout 180000 --exit",
     "test:smoke:emu": "DEVICE=emu npx mocha tests/00_launch_smoke.test.js --timeout 90000 --exit",
     "test:states:emu": "DEVICE=emu npx mocha tests/01_conversation_states.test.js --timeout 120000 --exit",

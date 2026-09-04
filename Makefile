@@ -90,7 +90,7 @@ wait-appium:
 # Format:  make <suite>-<device>
 #
 #   suite  : smoke | states | inference | stop | approval |
-#            toolmode | toolmode-se | python | all
+#            toolmode | toolmode-se | python | shared | all
 #   device : bc72 (real, arm64 + model) | emu (x86_64, UI-only)
 #
 #   emu  runs UI-only suites (smoke/states/approval) — inference/stop require

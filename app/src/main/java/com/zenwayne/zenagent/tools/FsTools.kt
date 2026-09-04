@@ -5,14 +5,17 @@ import agentflow.dsl.HostTool
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The three P1 filesystem tools (spec §4.2). Concurrency-safe under parallel
- * dispatch: reads are lock-free (writes are atomic temp+rename, so readers
- * never see partial content) and writes serialize on the caller side via the
- * approval gate (one gate per toolCallId).
+ * The three filesystem tools (spec §4.2). They speak to an [FsBackend] rather
+ * than the sandbox directly, so the same three tools serve both roots once
+ * [FsRouter] is in front of them (P3 shared storage).
+ *
+ * Concurrency-safe under parallel dispatch: reads are lock-free (sandbox writes
+ * are atomic temp+rename, so readers never see partial content) and writes
+ * serialize on the caller side via the approval gate (one gate per toolCallId).
  */
-class FsReadTool(private val ws: FsWorkspace) : HostTool {
+class FsReadTool(private val ws: FsBackend) : HostTool {
     override val name = "fs_read"
-    override val description = "Read a text file from the workspace. Returns content and byte size."
+    override val description = "Read a text file. Returns content and byte size."
     override val paramsJsonSchema =
         """{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}"""
     override val requiresApproval = false
@@ -23,11 +26,11 @@ class FsReadTool(private val ws: FsWorkspace) : HostTool {
 }
 
 class FsWriteTool(
-    private val ws: FsWorkspace,
+    private val ws: FsBackend,
     private val gates: ConcurrentHashMap<String, ApprovalGate>,
 ) : HostTool {
     override val name = "fs_write"
-    override val description = "Write a text file into the workspace. Requires user approval."
+    override val description = "Write a text file. Requires user approval."
     override val paramsJsonSchema =
         """{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}"""
     override val requiresApproval = true
@@ -43,9 +46,9 @@ class FsWriteTool(
     }
 }
 
-class FsListTool(private val ws: FsWorkspace) : HostTool {
+class FsListTool(private val ws: FsBackend) : HostTool {
     override val name = "fs_list"
-    override val description = "List directory entries in the workspace."
+    override val description = "List directory entries."
     override val paramsJsonSchema =
         """{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}"""
     override val requiresApproval = false

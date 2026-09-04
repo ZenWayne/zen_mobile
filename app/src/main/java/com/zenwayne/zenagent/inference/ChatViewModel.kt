@@ -19,6 +19,7 @@ import com.zenwayne.zenagent.data.ToolCall
 import com.zenwayne.zenagent.data.ToolIcon
 import com.zenwayne.zenagent.data.ToolStatus
 import com.zenwayne.zenagent.tools.HostToolRegistry
+import com.zenwayne.zenagent.tools.SharedStorageAccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -166,6 +167,13 @@ class ChatViewModel(
             }
         }
     }
+
+    /**
+     * The `/shared` grant (P3), so Settings can show and change it. Null in
+     * tests and design-state previews, which run without a registry.
+     */
+    val sharedStorage: SharedStorageAccess?
+        get() = registry?.sharedStorage
 
     /** Approve the pending gate for [toolCallId] (live tool-mode runs). */
     fun approve(toolCallId: String) {

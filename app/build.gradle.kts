@@ -73,6 +73,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+    // SAF DocumentFile tree for the authorized /shared root (P3).
+    implementation(libs.androidx.documentfile)
     debugImplementation(libs.androidx.ui.tooling)
     // ZenAgent on-device inference bridge (agentflow DSL + arm64 JNI lib).
     implementation(files("libs/agentflow-android.aar"))

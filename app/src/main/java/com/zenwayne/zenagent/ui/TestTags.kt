@@ -54,6 +54,10 @@ object TestTags {
     const val DRAWER_NEW_CHAT = "drawer_new_chat"
     const val DRAWER_SETTINGS = "drawer_settings"
 
+    // Settings — shared storage grant (P3)
+    const val SETTINGS_SHARED_STORAGE = "settings_shared_storage"
+    const val SETTINGS_SHARED_STORAGE_RELEASE = "settings_shared_storage_release"
+
     // T5 can't start agent
     const val T5_SCREEN = "t5_cant_start"
     const val T5_CLOSE = "t5_close"

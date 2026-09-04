@@ -5,7 +5,7 @@
 #
 # Format: <suite>-<device>
 #   suite  : smoke | states | inference | stop | approval |
-#            toolmode | toolmode-se | python | all
+#            toolmode | toolmode-se | python | shared | all
 #   device : bc72 | emu
 #
 # bc72 = real device (QV7808CA8G): full suites incl. on-device inference.
@@ -31,10 +31,11 @@ case "$SUITE" in
   toolmode)  FILE="tests/05_tool_mode_fs.test.js" ;;
   toolmode-se) FILE="tests/06_tool_mode_fs_side_effects.test.js" ;;
   python)    FILE="tests/07_tool_mode_python.test.js" ;;
+  shared)    FILE="tests/08_shared_storage.test.js" ;;
   all)       FILE="'tests/**/*.test.js'" ;;
   *)
     echo "ERROR: unknown suite '${SUITE}'" >&2
-    echo "Valid suites: smoke states inference stop approval toolmode toolmode-se python all" >&2
+    echo "Valid suites: smoke states inference stop approval toolmode toolmode-se python shared all" >&2
     exit 1
     ;;
 esac

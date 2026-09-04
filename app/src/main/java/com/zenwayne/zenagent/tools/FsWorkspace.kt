@@ -14,7 +14,7 @@ object FsLimits {
  * canonicalized and prefix-checked against the root: `..` and absolute paths
  * resolve inside the workspace; escapes are errors.
  */
-class FsWorkspace(private val root: File) {
+class FsWorkspace(private val root: File) : FsBackend {
     private val rootCanonical: String = root.canonicalPath
 
     fun resolve(path: String): Result<File> {
@@ -31,7 +31,7 @@ class FsWorkspace(private val root: File) {
         }
     }
 
-    fun read(path: String): String {
+    override fun read(path: String): String {
         val f = resolve(path).getOrElse { return err("invalid_path") }
         if (!f.isFile) return err("not_a_file")
         if (f.length() > FsLimits.READ_CAP_BYTES) return err("too_large")
@@ -41,7 +41,7 @@ class FsWorkspace(private val root: File) {
         return """{"content":${jsonEscape(text)},"bytes":${bytes.size}}"""
     }
 
-    fun write(path: String, content: String): String {
+    override fun write(path: String, content: String): String {
         val f = resolve(path).getOrElse { return err("invalid_path") }
         f.parentFile?.mkdirs()
         val tmp = File(f.parentFile, "${f.name}.tmp-${System.nanoTime()}")
@@ -58,7 +58,7 @@ class FsWorkspace(private val root: File) {
         }
     }
 
-    fun list(path: String): String {
+    override fun list(path: String): String {
         val d = resolve(path).getOrElse { return err("invalid_path") }
         if (!d.isDirectory) return err("not_a_directory")
         val entries = d.listFiles()?.take(FsLimits.LIST_CAP) ?: emptyList()

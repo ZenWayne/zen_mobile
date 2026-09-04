@@ -1,5 +1,7 @@
 package com.zenwayne.zenagent.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DrawerValue
@@ -42,6 +44,21 @@ fun AppRoot() {
     val scope = rememberCoroutineScope()
 
     var showSettings by remember { mutableStateOf(false) }
+
+    // P3 — the authorized /shared tree. The picker launcher must be created
+    // unconditionally (not inside the Settings branch) so it survives the
+    // activity recreation the system picker can cause.
+    val sharedStorage = chatViewModel.sharedStorage
+    var sharedStorageName by remember { mutableStateOf(sharedStorage?.displayName()) }
+    val sharedTreePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            sharedStorage?.authorize(uri)
+            sharedStorageName = sharedStorage?.displayName()
+        }
+    }
+
     var showCanStartError by remember { mutableStateOf(false) }
     var showRestoreError by remember { mutableStateOf(false) }
 
@@ -54,6 +71,12 @@ fun AppRoot() {
         SettingsScreen(
             user = SampleData.user,
             onBack = { showSettings = false },
+            sharedStorageName = sharedStorageName,
+            onAuthorizeSharedStorage = { sharedTreePicker.launch(null) },
+            onReleaseSharedStorage = {
+                sharedStorage?.release()
+                sharedStorageName = null
+            },
         )
         return
     }
