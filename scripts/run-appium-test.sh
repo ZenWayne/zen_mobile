@@ -4,7 +4,8 @@
 # Usage: run-appium-test.sh <target>
 #
 # Format: <suite>-<device>
-#   suite  : smoke | states | inference | stop | approval | all
+#   suite  : smoke | states | inference | stop | approval |
+#            toolmode | toolmode-se | python | all
 #   device : bc72 | emu
 #
 # bc72 = real device (QV7808CA8G): full suites incl. on-device inference.
@@ -27,10 +28,13 @@ case "$SUITE" in
   inference) FILE="tests/02_inference_streaming.test.js" ;;
   stop)      FILE="tests/03_stop_control.test.js" ;;
   approval)  FILE="tests/04_approval_gate.test.js" ;;
+  toolmode)  FILE="tests/05_tool_mode_fs.test.js" ;;
+  toolmode-se) FILE="tests/06_tool_mode_fs_side_effects.test.js" ;;
+  python)    FILE="tests/07_tool_mode_python.test.js" ;;
   all)       FILE="'tests/**/*.test.js'" ;;
   *)
     echo "ERROR: unknown suite '${SUITE}'" >&2
-    echo "Valid suites: smoke states inference stop approval all" >&2
+    echo "Valid suites: smoke states inference stop approval toolmode toolmode-se python all" >&2
     exit 1
     ;;
 esac
@@ -45,8 +49,12 @@ case "$DEVICE" in
     ;;
 esac
 
-# ── 4. Reject inference suites on the emulator ───────────────────────────────
-if [ "$DEVICE" = "emu" ] && { [ "$SUITE" = "inference" ] || [ "$SUITE" = "stop" ]; }; then
+# ── 4. Reject model-dependent suites on the emulator ─────────────────────────
+case "$SUITE" in
+  inference|stop|toolmode|toolmode-se|python) NEEDS_DEVICE=1 ;;
+  *) NEEDS_DEVICE=0 ;;
+esac
+if [ "$DEVICE" = "emu" ] && [ "$NEEDS_DEVICE" = "1" ]; then
   echo "ERROR: suite '${SUITE}' requires the arm64 .so + on-device model; run on bc72" >&2
   exit 1
 fi

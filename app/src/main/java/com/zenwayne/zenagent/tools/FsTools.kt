@@ -54,14 +54,3 @@ class FsListTool(private val ws: FsWorkspace) : HostTool {
         return ws.list(path)
     }
 }
-
-// Lightweight argument extraction from the JSON args string (avoiding a JSON
-// dependency): args look like {"path":"a.txt","content":"..."} with
-// backslash-escaped quotes/slashes.
-internal fun extractPath(argsJson: String): String? =
-    Regex("\"path\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
-        .find(argsJson)?.groupValues?.get(1)?.replace("\\/", "/")
-
-internal fun extractContent(argsJson: String): String? =
-    Regex("\"content\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
-        .find(argsJson)?.groupValues?.get(1)

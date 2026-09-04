@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    // Embedded CPython for the python_run tool (spec §3 / P2).
+    alias(libs.plugins.chaquopy)
 }
 
 android {
@@ -15,6 +17,9 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         vectorDrawables { useSupportLibrary = true }
+        // The agentflow engine is arm64-only, and Chaquopy requires an
+        // explicit ABI list so it packages just the matching runtime.
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     buildTypes {
@@ -41,6 +46,18 @@ android {
         jniLibs {
             useLegacyPackaging = true
         }
+    }
+}
+
+// python_run ships the standard library only (spec §8): no `pip` block, so the
+// APK grows by just the interpreter + stdlib. numpy/pandas remain a possible
+// later build flavor. Sources live in app/src/main/python/.
+chaquopy {
+    defaultConfig {
+        // Track the build host's default `python3`: Chaquopy requires a
+        // buildPython of the same major.minor as the target runtime, and
+        // pinning a version the machine lacks fails configuration outright.
+        version = "3.14"
     }
 }
 
