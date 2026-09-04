@@ -123,7 +123,9 @@ zen 分支 `chore/bcr-override-relative`。`registry` 属性只接受 URL（必�
 
 ### 真机 E2E
 - **一切 UI 交互走 Appium**，禁 adb 盲点盲打（中文 IME 会转写 `input text`）
-- `make e2e`：pm clear 清数据（仅保留模型：暂存 `/data/local/tmp`，清后设备内 cp 恢复）+ 重建 workspace 种子文件
+- `make e2e`：**定向删除**状态（`shared_prefs`/`cache`/`databases`/内部 `files`/workspace，
+  经 `run-as`）+ 重建 workspace 种子；**不碰 `files/models/`**，模型与 ~790MB
+  `.xnnpack_cache` 都保住。要连 SAF 系统授权一起清用 `make reset-device-full`（`pm clear`）
 - Compose 文本输入：`//android.widget.EditText` 节点 + setValue；输入后不要立即 hideKeyboard（会丢 composing text）——`typeAndCommit` 已封装
 - `pm clear` 后有瞬时竞态，recipe 已加 2s settle
 - 设备 IME 必须是非转换 IME（Gboard Latin），Appium unicodeKeyboard 能力**不要用**
