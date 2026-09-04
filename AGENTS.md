@@ -50,6 +50,12 @@ make start-all-bc72                  # 启动 Appium + 全量套件（真机）
 - **整套件开跑前清空应用数据**（`make e2e` 或 `make reset-device`）：`pm clear` 清空全部 App 数据，**仅保留模型**——模型先暂存在 `/data/local/tmp`（App 数据之外，`pm clear` 不销毁），清空后从暂存区恢复并重建 workspace 测试文件（`hello.txt`）。测试不得依赖上一次运行遗留的任何文件/缓存状态。
 - 推理类套件前置条件：真机 bc72 + arm64 `.so` 在 AAR 中 + 模型已推送至
   `/sdcard/Android/data/com.zenwayne.zenagent/files/models/gemma-4-E2B-it.litertlm`。
+- **整套 smoke 全红时先查窗口焦点**：`adb shell dumpsys window | grep mCurrentFocus`。
+  通知栏被下拉（`mCurrentFocus=NotificationShade`）会让 UiAutomator 查到通知栏而不是 App，
+  所有元素查找返回空、看着像代码回归——但 App 其实好好的（`pidof` 有进程、
+  `ResumedActivity` 就是 MainActivity）。`adb shell cmd statusbar collapse` 收起即可。
+  同理 `logcat -b crash` 里的崩溃未必是本 App 的，**先看包名**（踩过一次：是别的 App 在崩）。
+- 模型恢复是**设备内 `cp`**（2.6GB 不过 USB），reset 阶段慢就是它。
 - **`/shared` 的授权步骤是手工的**：`08_shared_storage.test.js` 只覆盖设置页入口和未授权
   错误路径。真正点系统文件选择器要驱动另一个 package 的 UI（各 OEM/版本布局不同），
   自动化必碎——授权后的读写属于**手工验收项**，别为它写 Appium。

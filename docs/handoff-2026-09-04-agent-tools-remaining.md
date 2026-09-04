@@ -66,8 +66,16 @@ zen 分支 `chore/bcr-override-relative`。`registry` 属性只接受 URL（必�
 
 ## 3. 验证证据
 
-**真机 E2E 全绿：22 passing / 0 failing（4 分钟，`make e2e`，pm clear 起跑）。**
-设备 XQ-BC72，装的是本分支构建的 APK。
+**真机 E2E 全绿：22 passing / 0 failing（`make e2e`，pm clear 起跑）。**
+设备 XQ-BC72，装的是本分支构建的 APK。`SafSharedStorage` 抽 `DocNode` 缝之后
+**重跑过一遍，仍然 22/22**。
+
+> **踩坑记录**：有一次整套 smoke 全红，看着像代码回归，实际是**通知栏被下拉了**
+> （`dumpsys window` 里 `mCurrentFocus=NotificationShade`）——UiAutomator 查的是通知栏
+> 而不是 App，所有元素查找都返回空。App 本身好好的（`pidof` 有进程、
+> `ResumedActivity` 是 MainActivity）。`adb shell cmd statusbar collapse` 之后同一个
+> APK 直接全绿。**排查顺序：先 `dumpsys window | grep mCurrentFocus`，再怀疑代码。**
+> 同理，logcat 里的 crash 未必是自己的——那次是 `com.cupidapp.live` 在崩。
 
 | 套件 | 用例 | 结果 |
 |---|---|---|
