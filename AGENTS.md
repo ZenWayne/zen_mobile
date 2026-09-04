@@ -92,6 +92,13 @@ make start-all-bc72                  # 启动 Appium + 全量套件（真机）
 
 - `FsBackend` 是 fs 三工具面对的接口；`FsWorkspace`（java.io 沙箱）和
   `SafSharedStorage`（SAF 树）各实现一份，`FsRouter` 按前缀分流。
+- **`DocNode` 是 SAF 的可测缝**（同 `PythonEngine` 的套路）：`DocumentFile`/
+  `ContentResolver` 在 JVM 上不存在，所以遍历与策略判断（哪一段必须是目录、何时创建、
+  读/列上限、二进制识别）都写在缝之上，用内存假树单测；`DocumentFileNode` 是薄适配层。
+  **别把判断逻辑写进适配层**——那里没有测试覆盖。
+- SAF provider 是第三方 App，**类型标志不可信**：`descend()` 明确拒绝穿过非目录节点，
+  哪怕它照样返回子节点（`aNonDirectoryIsNotTraversedThroughEvenIfItResolvesChildren` 盯着）。
+- provider 报的 `length` 只是提示，读回来还要**按实际字节再判一次上限**。
 - **默认落沙箱**：只有以绝对段 `/shared` 打头才走授权树。模型忘了前缀 → 写进无害的沙箱，
   这是安全的方向。
 - 授权：设置页 →「共享存储」→ `ACTION_OPEN_DOCUMENT_TREE` → `takePersistableUriPermission`；

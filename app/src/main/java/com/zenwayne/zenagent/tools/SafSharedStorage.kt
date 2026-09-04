@@ -1,10 +1,5 @@
 package com.zenwayne.zenagent.tools
 
-import android.content.Context
-import android.net.Uri
-import androidx.documentfile.provider.DocumentFile
-import java.io.IOException
-
 /**
  * Splits a `/shared`-relative path into plain child names (spec §8-P3).
  *
@@ -33,30 +28,27 @@ internal fun sharedSegments(path: String): Result<List<String>> {
  * [FsBackend] over a directory tree the user granted with
  * `ACTION_OPEN_DOCUMENT_TREE` (spec §8-P3).
  *
+ * Everything here is plain Kotlin over [DocNode]; the Android objects live in
+ * [DocumentFileNode]. [root] is re-invoked per call so a revoked grant stops
+ * resolving immediately rather than being cached for the process lifetime.
+ *
  * Two differences from the sandbox are deliberate and visible to callers:
  * writes are **not** atomic (SAF offers no rename-into-place, so a truncating
- * write is the only option) and traversal costs a `listFiles` per level, which
- * is why paths stay shallow in practice. Reads and listings honour the same
- * caps as the sandbox so a huge shared folder cannot flood the model.
+ * write is the only option) and traversal costs a child lookup per level,
+ * which is why paths stay shallow in practice. Reads and listings honour the
+ * same caps as the sandbox so a huge shared folder cannot flood the model.
  */
-class SafSharedStorage(
-    context: Context,
-    private val treeUri: Uri,
+class SafSharedStorage internal constructor(
+    private val root: () -> DocNode?,
 ) : FsBackend {
-
-    private val appContext = context.applicationContext
-
-    private fun root(): DocumentFile? = DocumentFile.fromTreeUri(appContext, treeUri)
 
     override fun read(path: String): String {
         val doc = walk(path).getOrElse { return err(INVALID) } ?: return err(NOT_FOUND)
         if (!doc.isFile) return err("not_a_file")
-        if (doc.length() > FsLimits.READ_CAP_BYTES) return err("too_large")
-        val bytes = try {
-            appContext.contentResolver.openInputStream(doc.uri)?.use { it.readBytes() }
-        } catch (e: IOException) {
-            null
-        } ?: return err("read_failed")
+        if (doc.length > FsLimits.READ_CAP_BYTES) return err("too_large")
+        val bytes = doc.readBytes() ?: return err("read_failed")
+        // The provider's reported length is a hint, not a guarantee — re-check
+        // against what actually came back before handing it to the model.
         if (bytes.size > FsLimits.READ_CAP_BYTES) return err("too_large")
         if (bytes.any { it == 0.toByte() }) return err("binary_file")
         val text = String(bytes, Charsets.UTF_8)
@@ -66,36 +58,29 @@ class SafSharedStorage(
     override fun write(path: String, content: String): String {
         val segments = sharedSegments(path).getOrElse { return err(INVALID) }
         val name = segments.lastOrNull() ?: return err("not_a_file")
-        val parent = descend(segments.dropLast(1), create = true) ?: return err("invalid_path")
-        val target = parent.findFile(name)
-            ?: parent.createFile(TEXT_MIME, name)
+        val parent = descend(segments.dropLast(1), create = true) ?: return err(INVALID)
+        val target = parent.child(name)
+            ?: parent.createFile(name)
             ?: return err("write_failed")
         if (target.isDirectory) return err("not_a_file")
-        return try {
-            // "wt" truncates: SAF has no rename-into-place, so unlike the
-            // sandbox this write is not atomic (documented in AGENTS.md).
-            appContext.contentResolver.openOutputStream(target.uri, "wt")?.use {
-                it.write(content.toByteArray(Charsets.UTF_8))
-            } ?: return err("write_failed")
-            """{"ok":true,"bytes":${content.toByteArray(Charsets.UTF_8).size}}"""
-        } catch (e: IOException) {
-            err("write_failed")
-        }
+        val bytes = content.toByteArray(Charsets.UTF_8)
+        if (!target.writeBytes(bytes)) return err("write_failed")
+        return """{"ok":true,"bytes":${bytes.size}}"""
     }
 
     override fun list(path: String): String {
         val doc = walk(path).getOrElse { return err(INVALID) } ?: return err(NOT_FOUND)
         if (!doc.isDirectory) return err("not_a_directory")
-        val body = doc.listFiles().take(FsLimits.LIST_CAP).joinToString(",") { f ->
+        val body = doc.children().take(FsLimits.LIST_CAP).joinToString(",") { f ->
             val type = if (f.isDirectory) "\"dir\"" else "\"file\""
-            val size = if (f.isFile) f.length() else 0
-            """{"name":${FsWorkspace.jsonEscape(f.name.orEmpty())},"type":$type,"size":$size}"""
+            val size = if (f.isFile) f.length else 0
+            """{"name":${FsWorkspace.jsonEscape(f.name)},"type":$type,"size":$size}"""
         }
         return """{"entries":[$body]}"""
     }
 
     /** Resolves an existing document, or null when a segment is missing. */
-    private fun walk(path: String): Result<DocumentFile?> {
+    private fun walk(path: String): Result<DocNode?> {
         val segments = sharedSegments(path).getOrElse { return Result.failure(it) }
         return Result.success(descend(segments, create = false))
     }
@@ -105,10 +90,10 @@ class SafSharedStorage(
      * a directory; with [create] set, missing directories are made along the
      * way (the last segment is left to the caller to create as a file).
      */
-    private fun descend(segments: List<String>, create: Boolean): DocumentFile? {
+    private fun descend(segments: List<String>, create: Boolean): DocNode? {
         var current = root() ?: return null
         segments.forEachIndexed { index, name ->
-            val existing = current.findFile(name)
+            val existing = current.child(name)
             val next = existing ?: if (create) current.createDirectory(name) else null
             if (next == null) return null
             if (index != segments.lastIndex && !next.isDirectory) return null
@@ -120,7 +105,6 @@ class SafSharedStorage(
     private fun err(code: String) = """{"error":"$code"}"""
 
     private companion object {
-        const val TEXT_MIME = "text/plain"
         const val NOT_FOUND = "not_found"
         const val INVALID = "invalid_path"
     }

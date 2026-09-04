@@ -3,6 +3,7 @@ package com.zenwayne.zenagent.tools
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
 
 /**
  * Remembers the directory tree the user authorized for `/shared` (spec §8-P3).
@@ -57,8 +58,20 @@ class SharedStorageAccess(context: Context) {
         prefs.edit().remove(KEY_TREE_URI).apply()
     }
 
-    /** The backend [FsRouter] should use for `/shared`, or null if unauthorized. */
-    fun backend(): FsBackend? = authorizedUri()?.let { SafSharedStorage(appContext, it) }
+    /**
+     * The backend [FsRouter] should use for `/shared`, or null if unauthorized.
+     *
+     * The tree is re-resolved on every traversal rather than captured once, so
+     * a grant revoked mid-run stops resolving on the next tool call.
+     */
+    fun backend(): FsBackend? {
+        if (authorizedUri() == null) return null
+        return SafSharedStorage {
+            authorizedUri()
+                ?.let { DocumentFile.fromTreeUri(appContext, it) }
+                ?.let { DocumentFileNode(appContext.contentResolver, it) }
+        }
+    }
 
     /** Last path segment of the tree, for display in Settings. */
     fun displayName(): String? = authorizedUri()?.let { uri ->
