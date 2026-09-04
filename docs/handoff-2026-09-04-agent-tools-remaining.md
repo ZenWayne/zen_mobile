@@ -64,26 +64,38 @@ zen 分支 `chore/bcr-override-relative`。`registry` 属性只接受 URL（必�
 
 ---
 
-## 3. 尚未完成的验证 ⚠️
+## 3. 验证证据
 
-**真机 E2E 一次都没跑。** 会话中途 XQ-BC72 从 USB 掉线（`adb devices` 空），无法恢复——重插线/解锁/重新授权 USB 调试是手工动作。
+**真机 E2E 全绿：22 passing / 0 failing（4 分钟，`make e2e`，pm clear 起跑）。**
+设备 XQ-BC72，装的是本分支构建的 APK。
 
-已就绪、等设备回来即可跑：
+| 套件 | 用例 | 结果 |
+|---|---|---|
+| 00 smoke | TC-SMOKE-001..004 | 4/4 |
+| 01 states | TC-STATES-001..006 | 6/6 |
+| 02 inference | TC-INF-001 | 1/1 |
+| 03 stop | TC-STOP-001 | 1/1 |
+| 04 approval | TC-APPROVAL-001..002 | 2/2 |
+| 05 tool mode fs | TC-TOOLMODE-001 | 1/1 |
+| 06 fs side effects | TC-TOOLMODE-002..004 | 3/3 |
+| **07 python（新）** | TC-TOOLMODE-005..006 | **2/2** |
+| **08 /shared（新）** | TC-SHARED-001..002 | **2/2** |
 
-```bash
-make e2e                                  # 全量（pm clear + 恢复模型 + 种子文件）
-cd tests/appium && npm run test:python    # 07 python_run
-cd tests/appium && npm run test:shared    # 08 /shared
-```
+**最担心的回归没有发生**：工具从 3 个加到 4 个、system prompt 变长之后，`05`/`06`
+的 fs 三工具选择依然正确（fs_read 19s、fs_write 20s、fs_list 23s、deny 19s），
+没有被 `python_run` 抢走。
 
-**跑之前务必留意**：工具变多、system prompt 变长，**对小模型的工具选择是有风险的**——重点回归 `05`/`06`（fs 三工具）有没有被 `python_run` 抢走。这是本轮最可能出问题的地方。
+`python_run` 首次真机执行 22.5s（含 `Python.start()`），说明延迟启动解释器这个决定
+在真机上是够用的——不需要为它牺牲冷启动。
 
-已有的证据（非真机部分）：
+其余证据：
 
 - zen_mobile JVM 单测 **56/56 绿**（原 14 → 新增 42：JsonArgs 11、PythonRunner 8、PythonRunTool 6、FsRouter 9、SharedPath 8）
 - RED 证据：把 `jsonUnescape` 短接成恒等后，8 个测试立刻失败
 - APK 构建通过，Python 3.14 运行时确认打进 APK
 - zen host JVM 测试 6/6（见 §2-C）
+
+**仍是手工验收项**：`/shared` 授权后的实际读写（要点系统文件选择器，见 §2-B）。
 
 ---
 
