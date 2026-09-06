@@ -20,9 +20,9 @@ import kotlinx.coroutines.withContext
  * (spec §4). Resolves the model under `getExternalFilesDir("models")` and
  * streams via [JsonWorkflow.streamTokens].
  *
- * Tool mode ([runAgentWithTools]) runs the constrained path with the fs tools
- * registered; tool lifecycle events stream live, final text arrives whole
- * (spec Q6-b).
+ * Tool mode ([runAgentWithTools]) runs the constrained path with the fs and
+ * Python tools registered; tool lifecycle events stream live, final text
+ * arrives whole (spec Q6-b).
  */
 class AgentflowInferenceClient(
     private val context: Context,
@@ -60,7 +60,7 @@ class AgentflowInferenceClient(
         loadWorkflow(modelPath, workflowJson)
     }
 
-    /** Tool-mode workflow JSON (spec §4.3): constrained decoding + fs tools. */
+    /** Tool-mode workflow JSON (spec §4.3): constrained decoding + host tools. */
     private val toolsWorkflowJson: String = """
         {
           "schema_version": 1,
@@ -69,9 +69,9 @@ class AgentflowInferenceClient(
           "state": {"kind": "dynamic_json", "fields": {}},
           "agents": {
             "main": {
-              "system_prompt": "You are Zen, an on-device assistant with file tools in a workspace directory.\nTools:\n- fs_read(path): read a text file's contents.\n- fs_write(path, content): create or overwrite a text file. The user must approve every write.\n- fs_list(path): list files and folders in a directory; use \".\" for the workspace root.\nRules:\n- Asked to read or show a file → fs_read. Asked to create, save, or write something to a file → fs_write. Asked what files exist → fs_list.\n- After a tool result, confirm briefly what you did.\n- Reply concisely in the user's language.",
+              "system_prompt": "You are Zen, an on-device assistant with file tools in a workspace directory.\nTools:\n- fs_read(path): read a text file's contents.\n- fs_write(path, content): create or overwrite a text file. The user must approve every write.\n- fs_list(path): list files and folders in a directory; use \".\" for the workspace root.\n- python_run(code): run a Python 3 snippet and capture its output; print() whatever you want back. The user must approve every run.\nRules:\n- Asked to read or show a file → fs_read. Asked to create, save, or write something to a file → fs_write. Asked what files exist → fs_list.\n- Asked to calculate, compute, or run code → python_run.\n- File paths are workspace-relative. A path starting with \"/shared/\" reaches the folder the user authorized in Settings; if none is authorized the tool returns shared_not_authorized.\n- After a tool result, confirm briefly what you did.\n- Reply concisely in the user's language.",
               "model": {"max_output_tokens": 512, "constrained_tool_calls": true},
-              "tools": ["fs_read", "fs_write", "fs_list"]
+              "tools": ["fs_read", "fs_write", "fs_list", "python_run"]
             }
           },
           "main": "main"

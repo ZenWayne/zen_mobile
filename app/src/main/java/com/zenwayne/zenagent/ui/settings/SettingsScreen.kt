@@ -34,10 +34,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.zenwayne.zenagent.data.SampleData
 import com.zenwayne.zenagent.data.UserProfile
+import com.zenwayne.zenagent.ui.TestTags
 import com.zenwayne.zenagent.ui.components.Avatar
 import com.zenwayne.zenagent.ui.theme.ZenColors
 
@@ -45,6 +48,10 @@ import com.zenwayne.zenagent.ui.theme.ZenColors
 fun SettingsScreen(
     user: UserProfile,
     onBack: () -> Unit,
+    /** Name of the authorized `/shared` tree, or null when none (P3). */
+    sharedStorageName: String? = null,
+    onAuthorizeSharedStorage: () -> Unit = {},
+    onReleaseSharedStorage: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -79,6 +86,12 @@ fun SettingsScreen(
             }
             SettingsGroup("隐私与数据") {
                 ToggleRow(ZenColors.Green, "本", "本地数据处理", initial = true)
+                Divider()
+                SharedStorageRow(
+                    name = sharedStorageName,
+                    onAuthorize = onAuthorizeSharedStorage,
+                    onRelease = onReleaseSharedStorage,
+                )
                 Divider()
                 NavRow(ZenColors.Accent, "存", "存储管理", value = "128 MB")
                 Divider()
@@ -182,6 +195,57 @@ private fun NavRow(accent: Color, glyph: String, title: String, value: String) {
         Text(value, color = ZenColors.TextSecondary, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.size(6.dp))
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ZenColors.TextSecondary, modifier = Modifier.size(18.dp))
+    }
+}
+
+/**
+ * The `/shared` grant (spec §8-P3). Tapping opens the system directory picker;
+ * once a tree is authorized the row shows which one and offers to revoke it.
+ * Without a grant the agent stays sandboxed, which is the safe default.
+ */
+@Composable
+private fun SharedStorageRow(
+    name: String?,
+    onAuthorize: () -> Unit,
+    onRelease: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onAuthorize)
+            .semantics { contentDescription = TestTags.SETTINGS_SHARED_STORAGE }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RowIcon(ZenColors.Violet, "享")
+        Spacer(Modifier.size(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("共享存储", color = ZenColors.TextOnDark, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (name != null) "Agent 可经 /shared 读写「" + name + "」" else "未授权 · Agent 仅限应用沙箱",
+                color = ZenColors.TextSecondary,
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+        Spacer(Modifier.size(6.dp))
+        if (name != null) {
+            Text(
+                "撤销",
+                color = ZenColors.Danger,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .clickable(onClick = onRelease)
+                    .semantics { contentDescription = TestTags.SETTINGS_SHARED_STORAGE_RELEASE }
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            )
+        } else {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = ZenColors.TextSecondary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }
 

@@ -22,7 +22,7 @@ WORKSPACE_DEV := /sdcard/Android/data/com.zenwayne.zenagent/files/workspace
 
 # ── Device reset (test hygiene) ───────────────────────────────────────────────
 
-.PHONY: stage-model reset-device e2e
+.PHONY: stage-model reset-device reset-device-full e2e
 
 # One-time: stage the model on-device outside app data.
 stage-model:
@@ -30,10 +30,39 @@ stage-model:
 		adb -s $(DEVICES) push $(MODEL_SRC) $(MODEL_STAGE)
 	@echo "→ model staged at $(MODEL_STAGE)"
 
-# Clear ALL app data, then restore ONLY the model + seed the workspace fixture.
-# Tests must start from a clean slate — in-memory state reset (resetToChat) is
-# not enough when suites write files / persist caches.
+# Reset the state a suite must not inherit, WITHOUT touching files/models/.
+#
+# `pm clear` is simpler but wipes models/ too, which costs a 2.6 GB on-device
+# copy back from staging on every run AND destroys the ~790 MB .xnnpack_cache,
+# so the first inference test then pays to regenerate it. Deleting only what
+# tests actually carry over keeps both.
+#
+# Cleared: shared_prefs (incl. the /shared SAF grant the app stores), caches,
+# databases, internal files, and the workspace fixture — then the workspace is
+# re-seeded. Internal app data is reachable only via `run-as`, which works
+# because the suite runs debug builds.
+#
+# CAVEAT vs pm clear: a persisted SAF URI grant lives in the system, not in app
+# data, so it survives this. The app reads its grant from shared_prefs, which IS
+# cleared, so /shared still reports unauthorized — but the system-side grant
+# lingers. Use `reset-device-full` when that matters.
 reset-device: stage-model
+	adb -s $(DEVICES) shell am force-stop com.zenwayne.zenagent
+	adb -s $(DEVICES) shell run-as com.zenwayne.zenagent \
+	  rm -rf shared_prefs cache code_cache databases files no_backup
+	adb -s $(DEVICES) shell rm -rf $(WORKSPACE_DEV)
+	@adb -s $(DEVICES) shell "test -s $(MODEL_DEV)" 2>/dev/null \
+	  || adb -s $(DEVICES) shell "mkdir -p $(dir $(MODEL_DEV)) \
+	    && cp $(MODEL_STAGE) $(MODEL_DEV) && chmod 644 $(MODEL_DEV)"
+	adb -s $(DEVICES) shell "mkdir -p $(WORKSPACE_DEV) \
+	  && echo 'ZenAgent workspace smoke test file.' > $(WORKSPACE_DEV)/hello.txt"
+	@echo "→ device reset: app state cleared, model + xnnpack cache kept, workspace seeded"
+
+# Nuclear reset: wipes EVERYTHING including the model, the xnnpack cache and any
+# persisted SAF grants, then restores the model from staging. Slow (on-device
+# 2.6 GB copy + cache regeneration) — reach for it when a leaked SAF grant or a
+# suspect cache is what you are trying to rule out.
+reset-device-full: stage-model
 	adb -s $(DEVICES) shell pm clear com.zenwayne.zenagent
 	@sleep 2
 	adb -s $(DEVICES) shell "mkdir -p \$$(dirname $(MODEL_DEV)) \
@@ -42,7 +71,7 @@ reset-device: stage-model
 	  && mkdir -p $(WORKSPACE_DEV) \
 	  && echo 'ZenAgent workspace smoke test file.' > $(WORKSPACE_DEV)/hello.txt \
 	  && ls -la \$$(dirname $(MODEL_DEV))"
-	@echo "→ device reset: app data cleared, model restored, workspace seeded"
+	@echo "→ device reset (full): all app data cleared, model restored, workspace seeded"
 
 # Full on-device E2E from a clean app-data state (Appium must be running).
 e2e: reset-device
@@ -89,7 +118,8 @@ wait-appium:
 #
 # Format:  make <suite>-<device>
 #
-#   suite  : smoke | states | inference | stop | approval | all
+#   suite  : smoke | states | inference | stop | approval |
+#            toolmode | toolmode-se | python | shared | all
 #   device : bc72 (real, arm64 + model) | emu (x86_64, UI-only)
 #
 #   emu  runs UI-only suites (smoke/states/approval) — inference/stop require
